@@ -1,0 +1,19 @@
+# Reset index for all dataframes to avoid conflicts
+spreadspoke_filtered_df = spreadspoke_filtered_df.reset_index(drop=True)
+teams_filtered_df = teams_filtered_df.reset_index(drop=True)
+stadiums_filtered_df = stadiums_filtered_df.reset_index(drop=True)
+
+# Merge spreadspoke_filtered_df with teams_filtered_df for home teams
+merged_df = pd.merge(spreadspoke_filtered_df, teams_filtered_df, 
+                     left_on='team_home', right_on='team_name', 
+                     how='left', suffixes=('_away', '_home'))
+
+# Merge again for away teams
+merged_df = pd.merge(merged_df, teams_filtered_df, 
+                     left_on='team_away', right_on='team_name', 
+                     how='left', suffixes=('_home', '_away'))
+
+# Finally, merge with stadiums_filtered_df
+final_merged_df = pd.merge(merged_df, stadiums_filtered_df, 
+                           how = 'left')
+final_merged_df.drop(final_merged_df[final_merged_df['schedule_season'] ==2001].index, inplace = True)
