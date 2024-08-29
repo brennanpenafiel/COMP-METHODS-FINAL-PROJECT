@@ -1,31 +1,35 @@
+
 def spread_cover(row):
     # Determine the non-favorite team
-    if row['team_favorite_id'] == row['team_home']:
-        row['team_not_favorite_id'] = row['team_away']
-    else:
-        row['team_not_favorite_id'] = row['team_home']
-
+    row['team_not_favorite_id'] = row['team_away'] if row['team_favorite_id'] == row['team_home'] else row['team_home']
+    
     # Determine if the favorite won or not
-    if row['favorite_won'] == 'No':
-        row['spread_cover'] = row['team_not_favorite_id']
-        row['favorite_covered'] = False  # Favorite did not cover
+    if row['score_favorite'] > row['score_not_favorite']:
+        favorite_won = True
+    elif row['score_favorite'] < row['score_not_favorite']:
+        favorite_won = False
     else:
-        if row['team_favorite_id'] == row['team_home']:
-            if row['score_home'] + row['spread_favorite'] > row['score_away']:
-                row['spread_cover'] = row['team_home']
-                row['favorite_covered'] = True  # Favorite covered
-            else:
-                row['spread_cover'] = row['team_away']
-                row['favorite_covered'] = False  # Favorite did not cover
+        favorite_won = None  # In case of a tie
+    
+    # Determine if the favorite covered the spread
+    if favorite_won is None:
+        row['spread_cover'] = None
+        row['favorite_covered'] = None
+    elif favorite_won:
+        if row['score_favorite'] - row['score_not_favorite'] > row['spread_favorite']:
+            row['spread_cover'] = row['team_favorite_id']
+            row['favorite_covered'] = True
         else:
-            if row['score_away'] + row['spread_favorite'] > row['score_home']:
-                row['spread_cover'] = row['team_away']
-                row['favorite_covered'] = True  # Favorite covered
-            else:
-                row['spread_cover'] = row['team_home']
-                row['favorite_covered'] = False  # Favorite did not cover
-
+            row['spread_cover'] = row['team_not_favorite_id']
+            row['favorite_covered'] = False
+    else:
+        row['spread_cover'] = row['team_not_favorite_id']
+        row['favorite_covered'] = False
+    
     return row
+
+# Apply the function to each row in the DataFrame
+spreadspoke_df = spreadspoke_df.apply(spread_cover, axis=1)
 
 # Apply the function to each row in the DataFrame
 spreadspoke_df = spreadspoke_df.apply(spread_cover, axis=1)
