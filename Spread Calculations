@@ -1,0 +1,127 @@
+def spread_cover(row):
+    # Determine the non-favorite team
+    if row['team_favorite_id'] == row['team_home']:
+        row['team_not_favorite_id'] = row['team_away']
+    else:
+        row['team_not_favorite_id'] = row['team_home']
+
+    # Determine if the favorite won or not
+    if row['favorite_won'] == 'No':
+        row['spread_cover'] = row['team_not_favorite_id']
+        row['favorite_covered'] = False  # Favorite did not cover
+    else:
+        if row['team_favorite_id'] == row['team_home']:
+            if row['score_home'] + row['spread_favorite'] > row['score_away']:
+                row['spread_cover'] = row['team_home']
+                row['favorite_covered'] = True  # Favorite covered
+            else:
+                row['spread_cover'] = row['team_away']
+                row['favorite_covered'] = False  # Favorite did not cover
+        else:
+            if row['score_away'] + row['spread_favorite'] > row['score_home']:
+                row['spread_cover'] = row['team_away']
+                row['favorite_covered'] = True  # Favorite covered
+            else:
+                row['spread_cover'] = row['team_home']
+                row['favorite_covered'] = False  # Favorite did not cover
+
+    return row
+
+# Apply the function to each row in the DataFrame
+spreadspoke_df = spreadspoke_df.apply(spread_cover, axis=1)
+
+import pandas as pd
+
+# Reset index to use 'schedule_date' as a column if needed
+spreadspoke_df = spreadspoke_df.reset_index()
+spreadspoke_df['schedule_date'] = pd.to_datetime(spreadspoke_df['schedule_date'])
+
+# Calculate margin of error for each game
+spreadspoke_df['predicted_score_home'] = spreadspoke_df['score_home'] + spreadspoke_df['spread_favorite']
+spreadspoke_df['predicted_score_away'] = spreadspoke_df['score_away'] - spreadspoke_df['spread_favorite']
+
+spreadspoke_df['margin_of_error_home'] = spreadspoke_df['predicted_score_home'] - spreadspoke_df['score_away']
+spreadspoke_df['margin_of_error_away'] = spreadspoke_df['predicted_score_away'] - spreadspoke_df['score_home']
+
+# Compute the absolute margin of error for each game
+spreadspoke_df['absolute_margin_of_error'] = spreadspoke_df[['margin_of_error_home', 'margin_of_error_away']].abs().max(axis=1)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Plot the margin of error for each game
+plt.figure(figsize=(14, 7))
+sns.scatterplot(x='schedule_date', y='absolute_margin_of_error', data=spreadspoke_df, alpha=0.7)
+
+plt.title('Margin of Error for Vegas Spread Predictions by Game')
+plt.xlabel('Game Date')
+plt.ylabel('Absolute Margin of Error')
+plt.grid(True)
+plt.show()
+
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.graph_objs as go
+import pandas as pd
+
+# Assuming you have already loaded your data into spreadspoke_df
+# Ensure 'schedule_date' is a datetime object
+spreadspoke_df['schedule_date'] = pd.to_datetime(spreadspoke_df['schedule_date'])
+
+# Calculate margin of error for each game
+spreadspoke_df['predicted_score_home'] = spreadspoke_df['score_home'] + spreadspoke_df['spread_favorite']
+spreadspoke_df['predicted_score_away'] = spreadspoke_df['score_away'] - spreadspoke_df['spread_favorite']
+spreadspoke_df['margin_of_error_home'] = spreadspoke_df['predicted_score_home'] - spreadspoke_df['score_away']
+spreadspoke_df['margin_of_error_away'] = spreadspoke_df['predicted_score_away'] - spreadspoke_df['score_home']
+spreadspoke_df['absolute_margin_of_error'] = spreadspoke_df[['margin_of_error_home', 'margin_of_error_away']].abs().max(axis=1)
+
+# Initialize the Dash app
+app = dash.Dash(__name__)
+
+# Define the layout of the dashboard
+app.layout = html.Div([
+    html.H1("Vegas Spread Margin of Error by Game"),
+    
+    # Dropdown for selecting favorite win/loss status
+    dcc.Dropdown(
+        id='win-loss-dropdown',
+        options=[
+            {'label': 'Favorite Won', 'value': 'Yes'},
+            {'label': 'Favorite Lost', 'value': 'No'}
+        ],
+        value='Yes'  # Default value
+    ),
+    
+    dcc.Graph(id='scatter-plot')
+])
+
+# Define callback to update graph based on favorite win/loss status selection
+@app.callback(
+    Output('scatter-plot', 'figure'),
+    [Input('win-loss-dropdown', 'value')]
+)
+def update_graph(selected_status):
+    # Filter data by selected favorite win/loss status
+    filtered_data = spreadspoke_df[spreadspoke_df['favorite_won'] == selected_status]
+    
+    trace = go.Scatter(
+        x=filtered_data['schedule_date'],
+        y=filtered_data['absolute_margin_of_error'],
+        mode='markers',
+        marker=dict(size=8),
+        name='Margin of Error'
+    )
+    
+    layout = go.Layout(
+        xaxis=dict(title='Game Date'),
+        yaxis=dict(title='Absolute Margin of Error (%)'),
+        title=f'Margin of Error for Vegas Spread Predictions - Favorite {"Won" if selected_status == "Yes" else "Lost"}',
+        showlegend=True
+    )
+    
+    return {'data': [trace], 'layout': layout}
+
+# Run the app
+if __name__ == '__main__':
+    app.run_server(debug=True)
